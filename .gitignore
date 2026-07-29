@@ -12,6 +12,9 @@ roberta_fakenews/
 # ── Eval plots dumped at repo root ──
 /*.png
 
+# ── Local-only long-form walkthrough (RESULTS.md is the public version) ──
+README_WALKTHROUGH.md
+
 # ── Python ──
 __pycache__/
 *.py[cod]
