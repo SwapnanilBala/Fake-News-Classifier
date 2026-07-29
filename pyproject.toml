@@ -1,0 +1,74 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fake-news-mlops"
+version = "0.1.0"
+description = "End-to-end MLOps pipeline for binary fake-news classification on the LIAR dataset."
+requires-python = ">=3.12"
+
+# Core runtime deps. These replace the active `!pip install` cells in
+# Fake_News_NLP.ipynb (datasets / huggingface_hub / ipywidgets, shap / lime)
+# plus the commented-out install block (transformers, sklearn, pandas, numpy,
+# torch, matplotlib, seaborn). After `pip install -e .` no notebook cell needs
+# to shell out to pip anymore.
+#
+# NOTE on torch: the lower bound below resolves a CPU wheel from PyPI. For the
+# CUDA build the notebook used (torch 2.10.0+cu128), install it first from the
+# CUDA index, then `pip install -e .` will see the requirement already satisfied:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128
+dependencies = [
+    # data + modeling
+    "datasets>=4.8,<5",
+    "transformers>=5.3,<6",
+    "huggingface_hub>=1.9,<2",
+    "accelerate>=1.13,<2",
+    "torch>=2.4,<3",
+    "scikit-learn>=1.8,<2",
+    "pandas>=2.2,<3",
+    "numpy>=2.0,<3",
+    # explainability
+    "shap>=0.51,<1",
+    "lime>=0.2,<1",
+    # eval plots
+    "matplotlib>=3.10,<4",
+    "seaborn>=0.13,<1",
+]
+
+[project.optional-dependencies]
+# FastAPI serving layer (src/serve) — the commented fastapi/uvicorn/multipart cell.
+serve = [
+    "fastapi>=0.135,<1",
+    "uvicorn[standard]>=0.41,<1",
+    "pydantic>=2.12,<3",
+    "python-multipart>=0.0.9",
+]
+# Experiment tracking + model registry for the training runs (src/train).
+train = [
+    "mlflow>=2.18,<3",
+]
+# Drift / calibration / slice-eval reports (src/monitor).
+monitor = [
+    "evidently>=0.4.40,<1",
+]
+# Running the original notebook interactively.
+notebook = [
+    "jupyter",
+    "notebook",
+    "ipywidgets>=8.1,<9",
+]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]

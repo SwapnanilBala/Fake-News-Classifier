@@ -1,0 +1,35 @@
+# ── ML artifacts (registry/MLflow holds the real ones) ──
+models/
+data/
+mlruns/
+
+# Existing on-disk training outputs (to be moved into models/)
+distilbert_fakenews/
+distilbert_fakenews_v2/
+distilbert_fakenews_v3/
+roberta_fakenews/
+
+# ── Eval plots dumped at repo root ──
+/*.png
+
+# ── Python ──
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# ── Virtualenvs ──
+.venv/
+venv/
+env/
+
+# ── Jupyter ──
+.ipynb_checkpoints/
+
+# ── OS / editor noise ──
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
