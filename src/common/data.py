@@ -10,30 +10,67 @@ Lifted from the data-prep cells of Fake_News_NLP.ipynb.
 
 from __future__ import annotations
 
-from datasets import Dataset, DatasetDict, concatenate_datasets, load_dataset
+import csv
+from pathlib import Path
+
+import pandas as pd
+from datasets import Dataset, DatasetDict, concatenate_datasets
 
 from common.labels import FAKE, REAL, LIAR_TO_BINARY
 
 # Default seed shared across balancing/shuffling so runs are reproducible.
 SEED = 42
 
+# Repo-local copy of the original UCSB LIAR release (train/valid/test TSVs).
+DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "liar"
 
-def load_liar() -> DatasetDict:
-    """Load the LIAR dataset (train/validation/test splits).
+# The TSVs have no header; column order is documented in data/liar/README.
+LIAR_COLUMNS = [
+    "id", "label", "statement", "subject", "speaker", "job_title", "state_info",
+    "party_affiliation", "barely_true_counts", "false_counts", "half_true_counts",
+    "mostly_true_counts", "pants_on_fire_counts", "context",
+]
 
-    Pulls the parquet conversion revision, which is the variant that loads
-    cleanly without the legacy dataset script.
+# DatasetDict split name -> TSV file stem.
+_SPLIT_FILES = {"train": "train", "validation": "valid", "test": "test"}
+
+
+def read_liar_tsv(path: str | Path) -> pd.DataFrame:
+    """Read one LIAR TSV into a DataFrame with named columns.
+
+    Quoting is disabled because statements contain stray quote characters --
+    with pandas' default quoting, 29 training rows silently merge into their
+    neighbours. Empty fields (job_title, state_info, context) stay "" not NaN.
     """
-    return load_dataset("ucsbnlp/liar", revision="refs/convert/parquet")
+    return pd.read_csv(
+        path, sep="\t", header=None, names=LIAR_COLUMNS,
+        quoting=csv.QUOTE_NONE, keep_default_na=False,
+    )
 
 
-def binarize(example: dict) -> dict:
+def load_liar(data_dir: str | Path = DATA_DIR) -> DatasetDict:
+    """Load the LIAR train/validation/test splits from the repo's TSVs.
+
+    Reads local files only -- no Hugging Face Hub access. The Hub repo now
+    ships just a loading script, which `datasets` 4.x no longer runs.
+    """
+    data_dir = Path(data_dir)
+    return DatasetDict({
+        split: Dataset.from_pandas(read_liar_tsv(data_dir / f"{stem}.tsv"))
+        for split, stem in _SPLIT_FILES.items()
+    })
+
+
+def binarize(example: dict, mapping: dict[str, int | None] = LIAR_TO_BINARY) -> dict:
     """Add a `binary_label` field (0=FAKE, 1=REAL, or None for the middle).
 
     Use as a `.map()` function. Rows with a None label survive this step and
-    are removed by :func:`drop_ambiguous`.
+    are removed by :func:`drop_ambiguous`. Pass the mapping via
+    ``fn_kwargs={"mapping": ...}`` so it is part of the `datasets` cache
+    fingerprint -- otherwise edits to LIAR_TO_BINARY silently reuse stale
+    cached results.
     """
-    example["binary_label"] = LIAR_TO_BINARY[example["label"]]
+    example["binary_label"] = mapping[example["label"]]
     return example
 
 
@@ -49,7 +86,7 @@ def prepare_binary(dataset: DatasetDict | None = None) -> DatasetDict:
     """Load (if needed), binarize, and drop the ambiguous middle in one call."""
     if dataset is None:
         dataset = load_liar()
-    dataset = dataset.map(binarize)
+    dataset = dataset.map(binarize, fn_kwargs={"mapping": LIAR_TO_BINARY})
     return drop_ambiguous(dataset)
 
 
@@ -73,37 +110,44 @@ def _count(split: Dataset, label: int) -> int:
     return split["binary_label"].count(label)
 
 
-def oversample_real(train: Dataset, seed: int = SEED) -> Dataset:
-    """Balance by repeating REAL rows up to the FAKE count, then shuffling.
-
-    This is the v1 strategy from the notebook. It keeps every FAKE example but
-    duplicates REAL ones, so the model sees the same REAL claims many times.
-    """
+def _split_by_size(train: Dataset) -> tuple[Dataset, Dataset]:
+    """Return (minority, majority) class subsets of `train`."""
     fake = train.filter(lambda x: x["binary_label"] == FAKE)
     real = train.filter(lambda x: x["binary_label"] == REAL)
+    minority, majority = sorted([fake, real], key=len)
+    return minority, majority
 
-    target = len(fake)
-    repeats = target // len(real)
-    remainder = target % len(real)
 
-    real_oversampled = concatenate_datasets(
-        [real] * repeats
-        + [real.shuffle(seed=seed).select(range(remainder))]
+def oversample_minority(train: Dataset, seed: int = SEED) -> Dataset:
+    """Balance by repeating minority rows up to the majority count, then shuffling.
+
+    This is the v1 strategy from the notebook. It keeps every majority example
+    but duplicates minority ones (FAKE on LIAR), so the model sees the same
+    minority claims many times.
+    """
+    minority, majority = _split_by_size(train)
+
+    target = len(majority)
+    repeats = target // len(minority)
+    remainder = target % len(minority)
+
+    minority_oversampled = concatenate_datasets(
+        [minority] * repeats
+        + [minority.shuffle(seed=seed).select(range(remainder))]
     )
-    return concatenate_datasets([fake, real_oversampled]).shuffle(seed=seed)
+    return concatenate_datasets([majority, minority_oversampled]).shuffle(seed=seed)
 
 
-def undersample_fake(train: Dataset, seed: int = SEED) -> Dataset:
-    """Balance by sampling FAKE rows down to the REAL count, then shuffling.
+def undersample_majority(train: Dataset, seed: int = SEED) -> Dataset:
+    """Balance by sampling majority rows down to the minority count, then shuffling.
 
     This is the v2/v3 strategy the notebook settled on -- it avoids the recall
-    collapse that oversampling caused by not showing duplicate REAL claims.
+    collapse that oversampling caused by not showing duplicate minority claims.
     """
-    fake = train.filter(lambda x: x["binary_label"] == FAKE)
-    real = train.filter(lambda x: x["binary_label"] == REAL)
+    minority, majority = _split_by_size(train)
 
-    fake_sampled = fake.shuffle(seed=seed).select(range(len(real)))
-    return concatenate_datasets([fake_sampled, real]).shuffle(seed=seed)
+    majority_sampled = majority.shuffle(seed=seed).select(range(len(minority)))
+    return concatenate_datasets([majority_sampled, minority]).shuffle(seed=seed)
 
 
 def build_balanced_train(
@@ -117,7 +161,7 @@ def build_balanced_train(
     "oversample".
     """
     if strategy == "undersample":
-        return undersample_fake(train, seed=seed)
+        return undersample_majority(train, seed=seed)
     if strategy == "oversample":
-        return oversample_real(train, seed=seed)
+        return oversample_minority(train, seed=seed)
     raise ValueError(f"unknown balancing strategy: {strategy!r}")

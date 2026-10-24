@@ -6,15 +6,18 @@ balanced, how text is tokenized, and how models are scored.
 """
 
 from common.data import (
+    DATA_DIR,
+    LIAR_COLUMNS,
     SEED,
     binarize,
     build_balanced_train,
     combine_features,
     drop_ambiguous,
     load_liar,
-    oversample_real,
+    oversample_minority,
     prepare_binary,
-    undersample_fake,
+    read_liar_tsv,
+    undersample_majority,
 )
 from common.labels import FAKE, LABEL_NAMES, LIAR_TO_BINARY, REAL
 from common.metrics import compute_metrics
@@ -33,13 +36,16 @@ __all__ = [
     "LIAR_TO_BINARY",
     # data
     "SEED",
+    "DATA_DIR",
+    "LIAR_COLUMNS",
+    "read_liar_tsv",
     "load_liar",
     "binarize",
     "drop_ambiguous",
     "prepare_binary",
     "combine_features",
-    "oversample_real",
-    "undersample_fake",
+    "oversample_minority",
+    "undersample_majority",
     "build_balanced_train",
     # tokenize
     "MAX_LENGTH",
