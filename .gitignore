@@ -1,7 +1,10 @@
 # ── ML artifacts (registry/MLflow holds the real ones) ──
 models/
-data/
+data/*
 mlruns/
+
+# ── LIAR source data: small (3 MB) and committed so the repo runs offline ──
+!data/liar/
 
 # Existing on-disk training outputs (to be moved into models/)
 distilbert_fakenews/
@@ -14,6 +17,10 @@ roberta_fakenews/
 
 # ── Local-only long-form walkthrough (RESULTS.md is the public version) ──
 README_WALKTHROUGH.md
+README_WALKTHROUGH.pdf
+
+# ── Local build scratch (walkthrough PDF build, incl. a Chrome profile) ──
+tmp/
 
 # ── Python ──
 __pycache__/
