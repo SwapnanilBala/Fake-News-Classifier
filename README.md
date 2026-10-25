@@ -97,4 +97,6 @@ monitoring with Evidently, and tests. Those packages (`src/train`, `src/serve`, 
 
 ## Stack
 
-Python · pandas · PyTorch · Hugging Face Transformers & Datasets · scikit-learn · SHAP / LIME
+Python · pandas · PyTorch · Hugging Face Transformers & Datasets · scikit-learn
+
+SHAP and LIME are listed in the notebook extras for planned explainability work; the notebook doesn't use them yet.
