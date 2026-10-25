@@ -32,8 +32,8 @@ majority-class floor.
   AUC, and the smallest validation → test drop (−0.015). The statement-only v3 drops −0.037.
   Anything trained on rich text needs all four fields at inference time.
 - **Validation and test disagree on the winner.** RoBERTa is best on validation (0.715) but third on
-  test (0.659), the largest drop of any model (−0.056). Its kept epoch was the last one (5), with
-  validation loss already rising from epoch 3. With ~800 rows per split, the standard error on
+  test (0.659), the largest drop of any model (−0.056). Its kept epoch was the last one (5), even
+  though validation loss bottomed out at epoch 3 (0.597) and rose after that (0.646 by epoch 5). With ~800 rows per split, the standard error on
   accuracy is about ±0.016, so the transformer ranking is not settled by one seed each.
 - **Oversampling still overfits.** v2's validation loss climbs 0.60 (epoch 2) → 1.65 (epoch 10)
   while validation F1 wanders between 0.64 and 0.67. Selecting by F1 kept epoch 8 (loss 1.50), and
